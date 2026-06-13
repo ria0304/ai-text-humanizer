@@ -18,7 +18,8 @@ A multi-pass NLP pipeline that rewrites AI-generated text into natural, human-li
 ## Detection Results
 
 Tested on 1000+ word AI-generated text:
-
+Mainly tested on https://www.humanizeai.pro/detector
+ 
 | Detector | Before | After |
 |:---------|:------:|:-----:|
 | Turnitin | ❌ AI | ✅ Human |

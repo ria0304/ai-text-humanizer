@@ -1,5 +1,6 @@
 # FlowWrite — AI Text Humanizer
 
+
 ![Python](https://img.shields.io/badge/Python-3.11-blue?style=flat-square&logo=python)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688?style=flat-square&logo=fastapi)
 ![Ollama](https://img.shields.io/badge/Ollama-llama3.2-black?style=flat-square)

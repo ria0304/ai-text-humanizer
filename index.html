@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 <title>FlowWrite </title>
 <link href="https://fonts.googleapis.com/css2?family=Crimson+Pro:ital,wght@0,400;0,600;1,400&family=DM+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <style>
   :root {
     --bg: #F7F6F2;
@@ -86,6 +87,14 @@
   .act-btn { background: var(--surface2); border: 1px solid var(--border); border-radius: 6px; padding: 5px 12px; font-size: 12px; color: var(--ink); cursor: pointer; transition: border-color 0.12s, color 0.12s; font-family: 'DM Sans', sans-serif; }
   .act-btn:hover { border-color: var(--accent); color: var(--accent); }
   .wcount { margin-left: auto; font-family: 'JetBrains Mono', monospace; font-size: 10px; color: var(--ink3); }
+  .dl-wrap { position: relative; display: inline-block; }
+  .dl-menu { display: none; position: absolute; bottom: calc(100% + 6px); left: 0; background: var(--surface); border: 1px solid var(--border-strong); border-radius: 8px; padding: 4px; min-width: 190px; box-shadow: 0 6px 18px rgba(0,0,0,0.12); z-index: 20; }
+  .dl-menu.open { display: block; }
+  .dl-item { display: flex; align-items: center; gap: 8px; width: 100%; text-align: left; background: none; border: none; padding: 8px 10px; border-radius: 6px; font-size: 12px; color: var(--ink); cursor: pointer; font-family: 'DM Sans', sans-serif; }
+  .dl-item:hover { background: var(--surface2); color: var(--accent); }
+  .dl-item .dl-tag { margin-left: auto; font-family: 'JetBrains Mono', monospace; font-size: 9px; color: var(--ink3); background: var(--surface2); padding: 2px 6px; border-radius: 4px; }
+  .dl-item.match { border: 1px solid var(--accent-light); background: var(--accent-light); }
+  .dl-item.match .dl-tag { color: var(--accent-dark); background: var(--surface); }
   .sidebar { display: flex; flex-direction: column; gap: 14px; }
   .scard { background: var(--surface); border: 1px solid var(--border); border-radius: 10px; padding: 16px; }
   .slabel { font-family: 'JetBrains Mono', monospace; font-size: 9px; letter-spacing: 2px; text-transform: uppercase; color: var(--ink3); margin-bottom: 12px; display: block; }
@@ -198,6 +207,15 @@
         <div class="status-bar" id="statusMsg"></div>
         <div class="out-actions" id="outActions">
           <button class="act-btn" onclick="copyOut()">Copy text</button>
+          <div class="dl-wrap">
+            <button class="act-btn" onclick="toggleDlMenu(event)">Download ▾</button>
+            <div class="dl-menu" id="dlMenu">
+              <button class="dl-item" id="dlItemMatch" onclick="downloadOriginalFormat()" style="display:none"></button>
+              <button class="dl-item" onclick="downloadPDF()">Download as PDF <span class="dl-tag">.pdf</span></button>
+              <button class="dl-item" onclick="downloadDOCX()">Download as Word <span class="dl-tag">.doc</span></button>
+              <button class="dl-item" onclick="downloadTXT()">Download as Text <span class="dl-tag">.txt</span></button>
+            </div>
+          </div>
           <button class="act-btn" onclick="clearAll()">Clear</button>
           <span class="wcount" id="wcount"></span>
         </div>
@@ -372,6 +390,8 @@
     document.getElementById('fileSize').textContent = formatSize(file.size);
     document.getElementById('fileLoaded').classList.add('show');
     document.getElementById('charCount').textContent = 'File loaded';
+    window._uploadedFileExt = ext;
+    window._uploadedFileBaseName = file.name.replace(/\.[^/.]+$/, '');
     if (ext === 'txt' || ext === 'md') {
       const reader = new FileReader();
       reader.onload = function (e) {
@@ -388,6 +408,8 @@
   function removeFile() {
     uploadedText = '';
     window._uploadedFile = null;
+    window._uploadedFileExt = null;
+    window._uploadedFileBaseName = null;
     document.getElementById('fileLoaded').classList.remove('show');
     document.getElementById('fileName').textContent = '—';
     document.getElementById('fileSize').textContent = '';
@@ -552,9 +574,127 @@
     document.getElementById('outLabel').textContent = '—';
     document.getElementById('evalCard').classList.remove('show');
     uploadedText = ''; window._uploadedFile = null;
+    window._uploadedFileExt = null; window._uploadedFileBaseName = null;
     document.getElementById('fileLoaded').classList.remove('show');
     document.getElementById('fileInput').value = '';
     setStatus('');
+  }
+
+  // ---------- Download as file (PDF / Word / Text, matching original upload format) ----------
+
+  function getOutputText() {
+    return document.getElementById('outputText').textContent || '';
+  }
+
+  function getOutputFilename(ext) {
+    const base = window._uploadedFileBaseName ? (window._uploadedFileBaseName + '-refined') : 'flowwrite-output';
+    return base + '.' + ext;
+  }
+
+  function triggerDownload(blob, filename) {
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
+  function escapeHtml(str) {
+    return str.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  }
+
+  function toggleDlMenu(e) {
+    if (e) e.stopPropagation();
+    const menu = document.getElementById('dlMenu');
+    const text = getOutputText();
+    if (!text) { setStatus('Nothing to download yet — refine some text first.', 'err'); return; }
+    // Show a "match original format" shortcut if a file was uploaded (.pdf/.docx/.txt/.md)
+    const matchItem = document.getElementById('dlItemMatch');
+    const ext = window._uploadedFileExt;
+    if (ext) {
+      const labelMap = { pdf: 'Download as PDF (matches upload)', docx: 'Download as Word (matches upload)', txt: 'Download as Text (matches upload)', md: 'Download as Markdown (matches upload)' };
+      matchItem.textContent = '';
+      const span1 = document.createElement('span'); span1.textContent = labelMap[ext] || ('Download as .' + ext);
+      const tag = document.createElement('span'); tag.className = 'dl-tag'; tag.textContent = '.' + (ext === 'docx' ? 'doc' : ext);
+      matchItem.appendChild(span1); matchItem.appendChild(tag);
+      matchItem.classList.add('match');
+      matchItem.style.display = 'flex';
+    } else {
+      matchItem.style.display = 'none';
+    }
+    menu.classList.toggle('open');
+  }
+
+  document.addEventListener('click', function (e) {
+    const wrap = document.querySelector('.dl-wrap');
+    const menu = document.getElementById('dlMenu');
+    if (menu && menu.classList.contains('open') && wrap && !wrap.contains(e.target)) {
+      menu.classList.remove('open');
+    }
+  });
+
+  function downloadOriginalFormat() {
+    const ext = window._uploadedFileExt;
+    document.getElementById('dlMenu').classList.remove('open');
+    if (ext === 'pdf') return downloadPDF();
+    if (ext === 'docx') return downloadDOCX();
+    return downloadTXT();
+  }
+
+  function downloadPDF() {
+    document.getElementById('dlMenu').classList.remove('open');
+    const text = getOutputText();
+    if (!text) { setStatus('Nothing to download yet — refine some text first.', 'err'); return; }
+    if (!window.jspdf) { setStatus('PDF library failed to load — check your internet connection.', 'err'); return; }
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF({ unit: 'pt', format: 'a4' });
+    const margin = 56;
+    const pageWidth = doc.internal.pageSize.getWidth();
+    const pageHeight = doc.internal.pageSize.getHeight();
+    const maxWidth = pageWidth - margin * 2;
+    const lineHeight = 16;
+    doc.setFont('times', 'normal');
+    doc.setFontSize(12);
+    let y = margin;
+    const paragraphs = text.split(/\n+/);
+    paragraphs.forEach(para => {
+      if (para.trim() === '') { y += lineHeight * 0.5; return; }
+      const lines = doc.splitTextToSize(para, maxWidth);
+      lines.forEach(line => {
+        if (y + lineHeight > pageHeight - margin) { doc.addPage(); y = margin; }
+        doc.text(line, margin, y);
+        y += lineHeight;
+      });
+      y += lineHeight * 0.5;
+    });
+    doc.save(getOutputFilename('pdf'));
+    setStatus('Downloaded as PDF.', 'ok');
+  }
+
+  function downloadDOCX() {
+    document.getElementById('dlMenu').classList.remove('open');
+    const text = getOutputText();
+    if (!text) { setStatus('Nothing to download yet — refine some text first.', 'err'); return; }
+    const paragraphs = text.split(/\n+/).map(p => '<p>' + (p.trim() ? escapeHtml(p) : '&nbsp;') + '</p>').join('');
+    const htmlDoc = '<html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word" xmlns="http://www.w3.org/TR/REC-html40">' +
+      '<head><meta charset="utf-8"><title>FlowWrite Output</title></head>' +
+      '<body style="font-family:Calibri, Arial, sans-serif; font-size:12pt; line-height:1.5;">' + paragraphs + '</body></html>';
+    const blob = new Blob(['\ufeff', htmlDoc], { type: 'application/msword' });
+    triggerDownload(blob, getOutputFilename('doc'));
+    setStatus('Downloaded as Word document (.doc).', 'ok');
+  }
+
+  function downloadTXT() {
+    document.getElementById('dlMenu').classList.remove('open');
+    const text = getOutputText();
+    if (!text) { setStatus('Nothing to download yet — refine some text first.', 'err'); return; }
+    const ext = window._uploadedFileExt === 'md' ? 'md' : 'txt';
+    const blob = new Blob([text], { type: 'text/plain;charset=utf-8' });
+    triggerDownload(blob, getOutputFilename(ext));
+    setStatus('Downloaded as ' + ext.toUpperCase() + '.', 'ok');
   }
 </script>
 </body>

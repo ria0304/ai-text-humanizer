@@ -14,7 +14,7 @@
 
 **Fonts:** Crimson Pro (serif body), DM Sans (UI), JetBrains Mono (labels/metrics)
 
-**Hosting:** AWS S3 (static website) + CloudFront CDN (HTTPS, global edge caching)
+**Hosting:** Local only — open `index.html` directly or serve with `python -m http.server`
 
 ---
 
@@ -33,7 +33,7 @@
 
 **File Parsing:** pdfplumber (PDF extraction), python-docx (DOCX extraction)
 
-**Hosting:** AWS EC2 m7i-flex.large (2 vCPU, 8GB RAM, Ubuntu 26.04 LTS), managed by systemd for auto-restart on reboot
+**Hosting:** Local only — started manually with `uvicorn main:app --port 8000` (or `run.bat` on Windows)
 
 ---
 
@@ -70,7 +70,7 @@ Injects invisible Unicode zero-width characters between tokens at strategic posi
 
 ## AI / Models
 
-**LLM Runtime:** Ollama — runs models locally on the EC2 instance (CPU mode, no GPU)
+**LLM Runtime:** Ollama — runs models locally on your machine (CPU mode, no GPU)
 
 **Primary Model:** `llama3.2:latest` (2 GB) — used for style rewriting and flow smoothing
 
@@ -113,36 +113,6 @@ SBERT cosine similarity between the original and rewritten text. Ensures meaning
 `evaluation/ai_phrase_detector.py`
 
 Detects and penalises known AI-typical phrases (delve, tapestry, it is important to note, etc.). Used as a quality filter rather than a weighted HLS dimension.
-
----
-
-## AWS Infrastructure
-
-**EC2:** m7i-flex.large instance (2 vCPU, 8GB RAM) running Ubuntu 26.04 LTS. Hosts FastAPI + Ollama. FastAPI managed by systemd — auto-restarts on crash or reboot.
-
-**S3:** `flowwrite-frontend` bucket with static website hosting enabled. Stores `index.html` (31 KB). Public read access via bucket policy.
-
-**CloudFront:** Distribution `E35B1O8DXHYISH` at `d37s95cs5nvhcl.cloudfront.net`. Routes `/*` to S3 and `/rewrite*`, `/evaluate*`, `/health*` to EC2 :8000. Handles HTTPS termination — no SSL cert needed on EC2.
-
-**Security Group:** `launch-wizard-4` — inbound rules for SSH (My IP only), HTTP (80), HTTPS (443), and FastAPI (8000).
-
-**IAM:** `github-actions-flowwrite` user with `AmazonS3FullAccess`, `CloudFrontFullAccess`, and `AmazonEC2FullAccess` for CI/CD operations.
-
----
-
-## CI/CD
-
-**Platform:** GitHub Actions
-
-**Trigger:** Push to `main` branch
-
-**Pipeline:**
-1. Checkout code
-2. Configure AWS credentials (via GitHub Secrets)
-3. Upload `index.html` to S3 with `no-cache` header
-4. Invalidate CloudFront cache (`/*`) so users always get the latest frontend
-
-**Secrets used:** `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, `AWS_REGION`, `S3_BUCKET`, `CLOUDFRONT_DISTRIBUTION_ID`
 
 ---
 

@@ -5,14 +5,11 @@
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688?style=flat-square&logo=fastapi)
 ![Ollama](https://img.shields.io/badge/Ollama-llama3.2-black?style=flat-square)
 ![spaCy](https://img.shields.io/badge/spaCy-3.7.4-09A3D5?style=flat-square)
-![CI/CD](https://img.shields.io/badge/CI%2FCD-GitHub%20Actions-2088FF?style=flat-square&logo=github-actions)
 ![License](https://img.shields.io/badge/License-MIT-green?style=flat-square)
 
 A multi-pass NLP pipeline that rewrites AI-generated text into natural, human-like writing — achieving **exceptionally low AI-detection scores** across 8 major detectors including Turnitin, GPTZero, and Copyleaks.
 
-🌐 **Live Demo:** [https://d15932fcjfkzr2.cloudfront.net/](https://d15932fcjfkzr2.cloudfront.net/)
-
-> **Architecture note:** The frontend is hosted on AWS S3 + CloudFront and is publicly accessible. The backend runs **locally on your machine** — AWS is not involved in any processing. You must start the local backend before the demo will work.
+> **Architecture note:** This app runs entirely locally. Open `index.html` in a browser (or serve it with `python -m http.server`) and start the backend with `uvicorn main:app --port 8000`. No cloud service is involved in any processing.
 
 ---
 
@@ -98,22 +95,17 @@ Input Text
 
 ## Architecture
 
-The frontend is hosted on AWS. The backend and all AI processing run entirely on your local machine — no data is sent to any cloud service.
+Everything runs on your local machine — no cloud service is involved.
 
 ```
-Browser
-   │
-   ▼
-CloudFront (HTTPS CDN)          ← AWS: serves the frontend only
-   └── /* → S3 (index.html)
-
-Your Machine                    ← All processing happens here
+Your Machine
+   ├── Browser (index.html, opened directly or via a local static server)
    ├── FastAPI (localhost:8000)
    ├── Ollama (llama3.2, CPU)
    └── spaCy / SBERT
 ```
 
-When you click "Refine Writing", the page loaded from S3 sends requests directly to `http://localhost:8000` on your machine. AWS does not handle or see any of your text.
+When you click "Refine Writing", the page sends requests directly to `http://localhost:8000` on your machine. No data leaves your computer.
 
 ---
 
@@ -157,11 +149,13 @@ The backend is now ready to accept requests from the frontend.
 
 ### 4. Open the app
 
-Visit the live frontend: [https://d15932fcjfkzr2.cloudfront.net/](https://d15932fcjfkzr2.cloudfront.net/)
+Open `index.html` directly in your browser, or serve it locally to avoid `file://` restrictions:
 
-The page will connect to your local backend automatically.
+```bash
+python -m http.server 5500
+```
 
-> **Note:** The app only works on the machine running the backend. It is not accessible to others via the CloudFront URL.
+Then visit `http://localhost:5500`. The page will connect to your local backend automatically (Backend URL field defaults to `http://localhost:8000`).
 
 ---
 
@@ -393,15 +387,6 @@ flowWrite--ai-text-humanizer/
 See [TECH_STACK.md](./TECH_STACK.md) for the full architecture breakdown.
 
 ---
-
-## CI/CD
-
-The frontend deploys automatically via GitHub Actions on every push to `main`:
-
-1. Uploads `index.html` to S3 with a `no-cache` header
-2. Invalidates the CloudFront cache so visitors always get the latest version
-
-The backend is not part of the CI/CD pipeline — it runs locally and is started manually.
 
 ---
 

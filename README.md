@@ -1,23 +1,34 @@
 # FlowWrite — AI Text Humanizer
 
-
 ![Python](https://img.shields.io/badge/Python-3.11-blue?style=flat-square&logo=python)
 ![FastAPI](https://img.shields.io/badge/FastAPI-0.115-009688?style=flat-square&logo=fastapi)
 ![Ollama](https://img.shields.io/badge/Ollama-llama3.2-black?style=flat-square)
 ![spaCy](https://img.shields.io/badge/spaCy-3.7.4-09A3D5?style=flat-square)
 ![License](https://img.shields.io/badge/License-MIT-green?style=flat-square)
 
-A multi-pass NLP pipeline that rewrites AI-generated text into natural, human-like writing — achieving **exceptionally low AI-detection scores** across 8 major detectors including Turnitin, GPTZero, and Copyleaks.
+A multi-pass NLP pipeline that rewrites AI-generated text into natural, human-like writing — targeting low AI-detection scores across detectors including Turnitin, GPTZero, and Copyleaks.
 
-> **Architecture note:** This app runs entirely locally. Open `index.html` in a browser (or serve it with `python -m http.server`) and start the backend with `uvicorn main:app --port 8000`. No cloud service is involved in any processing.
+> **Runs entirely locally.** Open `index.html` in a browser (or serve it with `python -m http.server`) and start the backend with `uvicorn main:app --port 8000`. No text leaves your machine.
+
+---
+
+## Two pipelines, and which endpoint actually runs which
+
+FlowWrite ships two pipeline versions. **Their behavior does not match their endpoint names** — this trips people up, so read it once:
+
+| Endpoint | Runs | Stages | Speed |
+|:---------|:-----|:------:|:-----:|
+| `/rewrite` | **V1** (`pipeline_controller.py`) | 5 — includes the Flow Smoother pass | Slower |
+| `/rewrite-v2` | **V2** (`pipeline_controller_v2.py`) | 4 — no Flow Smoother | ~3x faster |
+
+Benchmarking (see [`PIPELINE_COMPARISON.md`](./PIPELINE_COMPARISON.md)) found V2 matches or beats V1 on quality in 7 of 10 domain samples, and loses noticeably on healthcare and blog content, where the Flow Smoother's rhythm pass earns its keep. If you want the faster, generally-as-good pipeline, call `/rewrite-v2`, not `/rewrite`.
 
 ---
 
 ## Detection Results
 
-Tested on 1000+ word AI-generated text:
-Mainly tested on https://www.humanizeai.pro/detector
- 
+Tested on 1000+ word AI-generated text, mainly against [humanizeai.pro/detector](https://www.humanizeai.pro/detector). These are results from the project's own testing, not an independent audit — treat them as directional.
+
 | Detector | Before | After |
 |:---------|:------:|:-----:|
 | Turnitin | ❌ AI | ✅ Human |
@@ -32,23 +43,18 @@ Mainly tested on https://www.humanizeai.pro/detector
 
 ---
 
-## Benchmark Results (V1)
+## Benchmark Results
 
-Human Likeness Score (HLS) improvements across 5 domains:
+Human Likeness Score (HLS) improvements across 5 domains, 10 sample texts. Full numbers, per-sample timing, and the V1-vs-V2 breakdown are in [`PIPELINE_COMPARISON.md`](./PIPELINE_COMPARISON.md).
 
-| Sample | Domain | Original HLS | After HLS | Improvement |
-|:-------|:-------|:------------:|:---------:|:-----------:|
-| academic_01 | Academic | 0.563 | 0.822 | **+0.259** |
-| academic_02 | Academic | 0.653 | 0.826 | **+0.173** |
-| academic_03 | Academic | 0.572 | 0.931 | **+0.358** |
-| blog_01 | Blog | 0.624 | 0.731 | **+0.107** |
-| blog_02 | Blog | 0.626 | 0.831 | **+0.205** |
+| Pipeline | Avg HLS | Avg time/run |
+|:---------|:-------:|:------------:|
+| V1 (`/rewrite`) | 0.824 | 788s |
+| V2 (`/rewrite-v2`) | 0.839 | 275s |
 
 ---
 
-## How It Works
-
-FlowWrite runs text through 5 sequential stages, generates multiple rewrite candidates, scores each one using a Human Likeness Score (HLS), and returns the best result.
+## How It Works (V1 — `/rewrite`)
 
 ```
 Input Text
@@ -91,11 +97,11 @@ Input Text
                  Human-like Output
 ```
 
+`/rewrite-v2` runs the same pipeline **minus Stage 4** — Style Rewriter output goes straight to line-break fragmentation.
+
 ---
 
 ## Architecture
-
-Everything runs on your local machine — no cloud service is involved.
 
 ```
 Your Machine
@@ -105,7 +111,7 @@ Your Machine
    └── spaCy / SBERT
 ```
 
-When you click "Refine Writing", the page sends requests directly to `http://localhost:8000` on your machine. No data leaves your computer.
+The frontend talks directly to `http://localhost:8000`. There is no cloud component and no telemetry — everything happens on the machine you run it on.
 
 ---
 
@@ -132,7 +138,7 @@ python -m spacy download en_core_web_sm
 python -m uvicorn main:app --port 8000
 ```
 
-You should see output like:
+You should see:
 
 ```
 INFO:     Started server process [xxxxx]
@@ -141,11 +147,7 @@ INFO:     Application startup complete.
 INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
 ```
 
-The backend is now ready to accept requests from the frontend.
-
-> **Windows shortcut:** double-click `run.bat` to start the backend in one step instead of running the command above.
-
-> **Keep the terminal open** while using the app — closing it will shut down the backend.
+Keep this terminal open — closing it shuts down the backend.
 
 ### 4. Open the app
 
@@ -155,61 +157,39 @@ Open `index.html` directly in your browser, or serve it locally to avoid `file:/
 python -m http.server 5500
 ```
 
-Then visit `http://localhost:5500`. The page will connect to your local backend automatically (Backend URL field defaults to `http://localhost:8000`).
+Then visit `http://localhost:5500`. The API URL field in the top of the page defaults to `http://localhost:8000` and is editable if your backend runs elsewhere.
+
+### Windows shortcut
+
+`run.bat` automates all of the above in one step: it activates a virtual environment named `humanizer_env` (create this first with `python -m venv humanizer_env` and install requirements into it), starts the backend on port **8000**, starts a static file server on port **3000**, and opens `http://localhost:3000/index.html` in your browser automatically. It is not simply a shortcut for the `uvicorn` command — it manages both servers and the browser launch.
+
+There is no equivalent `run.sh` for macOS/Linux in this repo. On those platforms, start Ollama and the backend manually as shown below.
 
 ---
 
 ## Running the Backend
 
-### Quick start (any platform)
-
 ```bash
-# Step 1 — Start Ollama (must be running before the backend)
+# Terminal 1 — Ollama must be running before the backend
 ollama serve
 
-# Step 2 — In a new terminal, start the FastAPI backend
-python -m uvicorn main:app --port 8000
-```
-
-### Windows
-
-Double-click `run.bat` — it handles both steps automatically.
-
-### macOS / Linux
-
-```bash
-# Make the script executable (first time only)
-chmod +x run.sh
-
-# Run it
-./run.sh
-```
-
-Or run the two commands manually in separate terminals:
-
-```bash
-# Terminal 1
-ollama serve
-
-# Terminal 2
+# Terminal 2 — FastAPI backend
 python -m uvicorn main:app --port 8000 --reload
 ```
 
 ### Verify the backend is running
 
-Open your browser and go to:
-
 ```
 http://localhost:8000/health
 ```
 
-You should see:
+Expected response:
 
 ```json
-{ "status": "ok" }
+{ "status": "ok", "ollama": "ok", "ollama_model": "llama3.2:latest" }
 ```
 
-If you see a connection error, make sure both Ollama and the FastAPI server are running.
+If Ollama isn't reachable, `ollama` will report `"unreachable"` here even if the API itself is up.
 
 ### Common issues
 
@@ -218,8 +198,8 @@ If you see a connection error, make sure both Ollama and the FastAPI server are 
 | `Connection refused` on the frontend | Backend is not running — start it with the commands above |
 | `ollama: command not found` | Install Ollama from [https://ollama.com](https://ollama.com) |
 | `model not found` error | Run `ollama pull llama3.2` to download the model |
-| Port 8000 already in use | Run `python -m uvicorn main:app --port 8001` and update the frontend URL accordingly |
-| Slow rewriting | Normal on CPU — llama3.2 takes 30–90 seconds per rewrite without a GPU |
+| Port 8000 already in use | Run `python -m uvicorn main:app --port 8001` and update the API URL field in the page |
+| Slow rewriting | Expected on CPU — llama3.2 takes tens of seconds to several minutes per run without a GPU; `/rewrite` (V1) is markedly slower than `/rewrite-v2` |
 
 ---
 
@@ -227,16 +207,18 @@ If you see a connection error, make sure both Ollama and the FastAPI server are 
 
 | Method | Endpoint | Description |
 |:-------|:---------|:------------|
-| `POST` | `/rewrite` | Rewrite plain text |
-| `POST` | `/rewrite-file` | Rewrite uploaded `.txt`, `.md`, `.docx`, `.pdf` |
-| `POST` | `/evaluate` | Score original vs rewritten text |
-| `POST` | `/rewrite-and-evaluate` | Rewrite + score in one call |
-| `GET` | `/health` | Health check |
+| `POST` | `/rewrite` | Rewrite plain text — **V1 pipeline**, 5 stages |
+| `POST` | `/rewrite-v2` | Rewrite plain text — **V2 pipeline**, 4 stages, faster |
+| `POST` | `/rewrite-and-evaluate` | Rewrite (V1) + score in one call |
+| `POST` | `/rewrite-and-evaluate-v2` | Rewrite (V2) + score in one call |
+| `POST` | `/rewrite-file` | Rewrite uploaded `.txt`, `.md`, `.docx`, `.pdf` (uses V1) |
+| `POST` | `/evaluate` | Score an existing original/rewritten pair |
+| `GET` | `/health` | Health check — also reports Ollama reachability |
 
 ### Example request
 
 ```bash
-curl -X POST http://localhost:8000/rewrite \
+curl -X POST http://localhost:8000/rewrite-v2 \
   -H "Content-Type: application/json" \
   -d '{
     "text": "Your AI-generated text here.",
@@ -263,11 +245,13 @@ curl -X POST http://localhost:8000/rewrite \
 
 ### Available tones
 
+`tone` defaults to `"btech_student"` in the request schema, **but that key does not exist in the tone prompt table** — any unrecognized tone silently falls back to `formal_report`. Pass one of the values below explicitly if you want a specific voice:
+
 | Tone | Description |
 |:-----|:------------|
 | `student` | Student report voice — "we", "our", contractions |
 | `academic` | Research paper — hedged, first-person plural |
-| `formal_report` | Human analyst style — varied lengths, natural |
+| `formal_report` | Human analyst style — varied lengths, natural (also the silent fallback) |
 | `formal_professional` | Business memo — sharp and direct |
 | `conversational` | Blog post — contractions, personal voice |
 | `casual` | Texting a friend — short, punchy |
@@ -287,7 +271,7 @@ curl -X POST http://localhost:8000/rewrite \
 
 ## Human Likeness Score (HLS)
 
-Every rewrite is scored across 5 dimensions. The pipeline generates 3 candidates and returns the one with the highest weighted HLS.
+Each run generates 3 candidates and returns the one with the highest weighted HLS, scored across 5 dimensions:
 
 | Metric | Weight | What it measures |
 |:-------|:------:|:----------------|
@@ -297,11 +281,13 @@ Every rewrite is scored across 5 dimensions. The pipeline generates 3 candidates
 | Connector density | 10% | Natural transition word usage |
 | Semantic similarity | 10% | Meaning preserved vs original |
 
+`evaluation/ai_phrase_detector.py` additionally flags known AI-typical phrases (e.g. "delve", "tapestry", "it is important to note") as a quality filter — it does not contribute to the weighted score above.
+
 ---
 
 ## Benchmark Suite
 
-FlowWrite includes a benchmark suite of 10 AI-generated sample texts across 5 domains.
+10 AI-generated sample texts across 5 domains, in `tests/samples/`:
 
 | Domain | Files | Tone used |
 |:-------|:-----:|:----------|
@@ -311,19 +297,19 @@ FlowWrite includes a benchmark suite of 10 AI-generated sample texts across 5 do
 | Business | 2 | `formal_professional` |
 | Healthcare | 1 | `formal_report` |
 
-Run a benchmark test:
+Run one manually:
 
 ```bash
 curl -X POST http://localhost:8000/rewrite-and-evaluate \
   -H "Content-Type: application/json" \
   -d '{
-    "text": "'$(cat tests/samples/academic_01.txt)'",
+    "text": "'"$(cat tests/samples/academic_01.txt)"'",
     "tone": "academic",
     "aggressiveness": 2
   }'
 ```
 
-Results are tracked in [`tests/samples/benchmark_notes.md`](./tests/samples/benchmark_notes.md).
+Results are tracked in [`tests/benchmark_notes.md`](./tests/benchmark_notes.md); the full V1-vs-V2 comparison is in [`PIPELINE_COMPARISON.md`](./PIPELINE_COMPARISON.md).
 
 ---
 
@@ -332,10 +318,10 @@ Results are tracked in [`tests/samples/benchmark_notes.md`](./tests/samples/benc
 **Change LLM model** — in `pipeline/style_rewriter.py` and `pipeline/flow_smoother.py`:
 
 ```python
-MODEL_NAME = "llama3.2"   # or: mistral, gemma, phi3, etc.
+MODEL_NAME = "llama3.2:latest"   # or: mistral, gemma, phi3, etc.
 ```
 
-**Change number of candidates** — in `pipeline/pipeline_controller.py`:
+**Change number of candidates** — in `pipeline/pipeline_controller.py` and `pipeline/pipeline_controller_v2.py`:
 
 ```python
 NUM_CANDIDATES = 3   # more = better quality, slower
@@ -367,17 +353,19 @@ flowWrite--ai-text-humanizer/
 │   ├── style_rewriter.py
 │   ├── flow_smoother.py
 │   ├── line_breaker.py
-│   ├── pipeline_controller.py
-│   └── pipeline_controller_v2.py
+│   ├── pipeline_controller.py       # V1 — 5 stages, used by /rewrite
+│   └── pipeline_controller_v2.py    # V2 — 4 stages, used by /rewrite-v2
 ├── tests/
-│   └── samples/
-│       ├── academic_01.txt … healthcare_01.txt
-│       └── benchmark_notes.md
+│   ├── samples/
+│   │   └── academic_01.txt … healthcare_01.txt
+│   └── benchmark_notes.md
 ├── shared_models.py
 ├── main.py
 ├── index.html
 ├── requirements.txt
-└── run.bat
+├── run.bat
+├── TECH_STACK.md
+└── PIPELINE_COMPARISON.md
 ```
 
 ---
@@ -385,8 +373,6 @@ flowWrite--ai-text-humanizer/
 ## Tech Stack
 
 See [TECH_STACK.md](./TECH_STACK.md) for the full architecture breakdown.
-
----
 
 ---
 

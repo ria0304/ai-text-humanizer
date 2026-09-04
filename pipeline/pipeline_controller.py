@@ -24,7 +24,26 @@ def _quality_score(hls_result: dict) -> float:
         + 0.10 * dims["similarity"]["score"],   # was 0.20
         3,
     )
-async def run_pipeline(text: str, tone: str = "formal_report", aggressiveness: int = 2) -> dict:
+
+async def run_pipeline(
+    text: str,
+    tone: str = "formal_report",
+    aggressiveness: int = 2,
+    enable_stage5: bool = True
+) -> dict:
+    """
+    Run the full FlowWrite pipeline.
+    
+    Args:
+        text: Input text to process
+        tone: Writing tone for rewriting
+        aggressiveness: Aggressiveness level for rewriting (1-3)
+        enable_stage5: If True, apply Stage 5 (Line Break Fragmentation).
+                      If False, skip Stage 5 for ablation studies.
+    
+    Returns:
+        Dictionary containing final text, stage information, and evaluation
+    """
     word_count = len(text.split())
     if word_count > MAX_WORDS:
         raise ValueError(f"Input too long: {word_count} words. Maximum is {MAX_WORDS} words.")
@@ -65,9 +84,15 @@ async def run_pipeline(text: str, tone: str = "formal_report", aggressiveness: i
 
     logger.info(f"Best candidate score: {best_score}")
 
-    # Stage 5 — Line break fragmentation
-    logger.info("Stage 5: Line break fragmentation...")
-    final = apply_line_break_trick(best_text)
+    # Stage 5 — Line break fragmentation (optional for ablation studies)
+    if enable_stage5:
+        logger.info("Stage 5: Line break fragmentation...")
+        final = apply_line_break_trick(best_text)
+        stage5_applied = True
+    else:
+        logger.info("Stage 5: SKIPPED (ablation study)")
+        final = best_text
+        stage5_applied = False
 
     logger.info("Pipeline complete.")
 
@@ -78,8 +103,9 @@ async def run_pipeline(text: str, tone: str = "formal_report", aggressiveness: i
             "semantic_merge": f"{len(merged)} units after merge",
             "candidates": f"{NUM_CANDIDATES} candidates generated",
             "selection": "best candidate selected by quality score",
-            "line_break_fragmentation": "done",
+            "line_break_fragmentation": "done" if stage5_applied else "skipped",
         },
+        "stage5_applied": stage5_applied,
         "evaluation": best_eval,
         "best_score": best_score,
     }

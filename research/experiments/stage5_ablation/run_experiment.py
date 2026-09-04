@@ -27,7 +27,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent.parent))
 
 from pipeline.pipeline_controller_v2 import run_pipeline_v2
 from evaluation.hls import compute_hls
-from evaluation.semantic_similarity import compute_semantic_similarity
+from evaluation.semantic_similarity import semantic_similarity
 
 
 def load_config() -> Dict:
@@ -117,7 +117,8 @@ def compute_content_preservation(original: str, transformed: str) -> Dict:
     
     # Semantic similarity
     try:
-        semantic_sim = compute_semantic_similarity(original_clean, transformed_visible)
+        semantic_sim_result = semantic_similarity(original_clean, transformed_visible)
+        semantic_sim = semantic_sim_result.get("score", 0.0) if isinstance(semantic_sim_result, dict) else 0.0
     except Exception as e:
         semantic_sim = {"similarity": 0.0, "error": str(e)}
     
@@ -126,7 +127,7 @@ def compute_content_preservation(original: str, transformed: str) -> Dict:
         "word_precision": round(word_precision, 4),
         "word_recall": round(word_recall, 4),
         "word_f1": round(word_f1, 4),
-        "semantic_similarity": semantic_sim.get("similarity", 0.0) if isinstance(semantic_sim, dict) else 0.0
+        "semantic_similarity": semantic_sim if not isinstance(semantic_sim, dict) else 0.0
     }
 
 

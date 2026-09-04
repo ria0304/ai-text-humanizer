@@ -13,23 +13,30 @@ env/
 .env.local
 .env.*
 
-# Logs
-*.log
-
-# Editor/IDE
-.vscode/
-.idea/
-*.swp
-*.swo
-*.tmp
-
-# Build/dist
+# Build artifacts
 dist/
 build/
 *.egg-info/
 
-# Testing
+# Logs
+*.log
+
+# Editors
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# Coverage
 .coverage
+coverage/
 htmlcov/
-.coverage.*
+
+# Testing
+.pytest_cache/
+.mypy_cache/
+
+# OS
+.DS_Store
+Thumbs.db
 ```

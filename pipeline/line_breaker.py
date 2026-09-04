@@ -64,7 +64,9 @@ def fragment_sentences(text: str) -> Tuple[str, List[Dict]]:
 
         fragmented.append(new_sentence)
 
-    return "\n".join(fragmented), perturbations
+    # Join with original separator (space after punctuation), not newline
+    # We need to preserve the original structure
+    return " ".join(fragmented), perturbations
 
 
 def inject_invisible_breaks(text: str) -> Tuple[str, List[Dict]]:

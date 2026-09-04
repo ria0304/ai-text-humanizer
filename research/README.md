@@ -79,6 +79,5 @@ Estimated **4-6 weeks** to submission-ready manuscript (see `RESEARCH_PROGRESS.m
 
 **For detailed progress tracking:** See `RESEARCH_PROGRESS.md`
 
-**For paper structure:** See `paper_outline.md`
 
 **Last updated:** September 3, 2025

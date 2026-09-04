@@ -1,11 +1,13 @@
 import httpx
 import json
 import logging
+import os
 
 logger = logging.getLogger(__name__)
 
-OLLAMA_URL = "http://localhost:11434/api/generate"
-MODEL_NAME = "llama3.2:latest"
+# Configurable via environment variable or default to qwen2.5:latest
+OLLAMA_URL = os.getenv("OLLAMA_URL", "http://localhost:11434/api/generate")
+MODEL_NAME = os.getenv("FLOWWRITE_MODEL", "qwen2.5:latest")
 
 TONE_PROMPTS = {
     "student": "Rewrite as a real  student writing a report. Use 'we', 'our', 'basically', 'so', contractions. Mix short and long sentences. Start some with 'And', 'But', 'So'. Use pronouns like 'we found', 'we noticed'. NEVER use: 'furthermore', 'additionally', 'it is worth noting', 'crucial', 'fundamental', 'significant', 'ultimately', 'leverage', 'delve', 'multifaceted', 'unprecedented'.",

@@ -1,6 +1,10 @@
-humanizer_env/
-__pycache__/
-*.pyc
-.env
-.vscode/
-.idea/
+```
+# Research experiment results - JSON files
+research/experiments/results/*.json
+
+# Research experiment results - CSV files
+research/experiments/results/*.csv
+
+# Statistical analysis report
+research/experiments/results/statistical_analysis_report.json
+```
